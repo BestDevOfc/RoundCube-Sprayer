@@ -130,7 +130,8 @@ class Sprayer(object):
 
 
 if __name__ == "__main__":
-    urls = list(set(open("urls.txt", 'r').readlines()))
+    urls_file = input(f"[ Urls File Path ]: ").strip().rstrip()
+    urls = list(set(open(urls_file, 'r').readlines()))
     checkerObj = Sprayer( urls )
     checkerObj.main()
         
